@@ -32,7 +32,6 @@ fn main() {
 
 	done := chan bool{}
 
-	// Buffered the signal channel, allowing the main thread not to block when sending it over the channel in another thread
 	signals := chan os.Signal{}
 	os.signal_opt(os.Signal.int, capture_signal(signals))!
 	go signal_listen(signals, done)
