@@ -3,7 +3,6 @@ module main
 import os
 import net.http
 import actioncable
-import time
 import x.json2
 
 fn capture_signal(signals chan os.Signal) fn (os.Signal) {
@@ -24,7 +23,7 @@ fn signal_listen(signals chan os.Signal, done chan bool) {
 }
 
 fn main() {
-	docker := DockerClient.new()
+	_ := DockerClient.new()
 
 	mut headers := http.new_header()
 	// This is not a real credentials you foool
@@ -56,7 +55,7 @@ fn main() {
 				println("ev: ${ev}")
 			}
 
-			status := <-done {
+			_ := <-done {
 				default_logger.info('receive done signal, closing connection')
 
 				consumer.close()!

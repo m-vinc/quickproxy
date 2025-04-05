@@ -2,8 +2,6 @@ module actioncable
 
 import net.http
 import net.websocket
-import x.json2
-import strconv
 import time
 
 fn Connection.new(url string, header http.Header) !&Connection {
@@ -26,12 +24,10 @@ fn Connection.new(url string, header http.Header) !&Connection {
 		conn.monitor <- true
 	})
 
-	// // use on_close_ref if you want to send any reference object
 	conn.client.on_close(fn [mut conn] (mut ws websocket.Client, code int, reason string) ! {
 		conn.client.logger.info('on_close the connection to the server successfully closed (${code} - ${reason})')
 	})
 
-	// on new messages from other clients, display them in blue text
 	conn.client.on_message(fn [mut conn] (mut ws websocket.Client, msg &websocket.Message) ! {
 		match msg.opcode {
 			.continuation {}
@@ -64,42 +60,6 @@ mut:
 	on_text_message_callbacks []TextMessageFn
 }
 
-// fn (mut conn Connection) on_text_message(ws &websocket.Client, msg &websocket.Message) ! {
-// 	payload := json2.decode[Payload](msg.payload.bytestr()) or { return err }
-//
-// 	match payload.type {
-// 		welcome { conn.h_welcome(ws, payload)! }
-// 		disconnect { conn.client.pong()! }
-// 		ping { conn.h_ping(ws, payload)! }
-// 		confirmation { conn.client.pong()! }
-// 		rejection { conn.client.pong()! }
-// 		unauthorized { conn.client.pong()! }
-// 		invalid_request { conn.client.pong()! }
-// 		server_restart { conn.client.pong()! }
-// 		remote { conn.client.pong()! }
-// 		else { conn.client.logger.info('receive unknown payload type: ${payload.type} - ${msg.payload.bytestr()}') }
-// 	}
-//
-// 	return
-// }
-
-fn (mut conn Connection) h_welcome(ws &websocket.Client, payload Payload) ! {
-	conn.client.logger.info('receive welcome !')
-	return
-}
-
-fn (mut conn Connection) h_ping(ws &websocket.Client, payload Payload) ! {
-	if payload.message == none {
-		return
-	}
-
-	ts_string := payload.message or { return error('ping message is not present') }
-	ts := strconv.atoi(ts_string)!
-
-	conn.client.logger.info('receive ping ${ts} !')
-	return
-}
-
 fn (mut conn Connection) listen() ! {
 	conn.client.connect()!
 
@@ -115,7 +75,7 @@ fn (mut conn Connection) monitor() ! {
 	conn.client.logger.info('Start monitoring process')
 	for {
 		select {
-			m := <-conn.monitor {
+			_ := <-conn.monitor {
 				conn.client.logger.info('can we try to re-connect ?')
 			}
 			500 * time.millisecond {

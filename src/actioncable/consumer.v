@@ -1,6 +1,5 @@
 module actioncable
 
-import time
 import net.http
 import net.websocket
 import x.json2
@@ -70,6 +69,8 @@ pub fn (mut consumer Consumer) subscribe(channel string, data json2.Any) ! {
 		consumer.connection.write_string(subscribe_command)!
 	}
 }
+
+pub fn (mut consumer Consumer) unsubscribe()
 
 pub fn (mut consumer Consumer) close() ! {
 	consumer.connection.close()!
