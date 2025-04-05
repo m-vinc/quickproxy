@@ -32,3 +32,7 @@ pub struct Identifier {
 fn (s Subscription) subscribe_command() string {
 	return json2.encode[Command](Command{command: "subscribe", identifier: s.identifier, data: s.data})
 }
+
+fn (s Subscription) unsubscribe_command() string {
+	return json2.encode[Command](Command{command: "unsubscribe", identifier: s.identifier, data: s.data})
+}

@@ -11,7 +11,6 @@ pub fn Consumer.new(url string, header http.Header) !&Consumer {
 	mut consumer := &Consumer{
 		connection: Connection.new(url, header)!,
 		subscriptions: subscriptions,
-		pump: chan Event{}
 	}
 
 	consumer.connection.on_text_message(fn [mut consumer] (mut ws websocket.Client, msg &websocket.Message) {
@@ -46,7 +45,6 @@ mut:
 	connection    &Connection
 	subscriptions shared []&Subscription
 pub mut:
-	pump chan Event
 	logger &log.Logger = default_logger
 }
 
@@ -70,7 +68,18 @@ pub fn (mut consumer Consumer) subscribe(channel string, data json2.Any) ! {
 	}
 }
 
-pub fn (mut consumer Consumer) unsubscribe()
+pub fn (mut consumer Consumer) unsubscribe(channel string, data json2.Any) ! {
+	lock consumer.subscriptions {
+		for i, sub in consumer.subscriptions {
+			if sub.channel == channel {
+				consumer.connection.write_string(sub.unsubscribe_command())!
+
+				consumer.subscriptions.delete(i)
+				break
+			}
+		}
+	}
+}
 
 pub fn (mut consumer Consumer) close() ! {
 	consumer.connection.close()!

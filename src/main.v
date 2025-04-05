@@ -1,6 +1,7 @@
 module main
 
 import os
+import time
 import net.http
 import actioncable
 import x.json2
@@ -50,10 +51,6 @@ fn main() {
 
 	for {
 		select {
-			ev := <-consumer.pump {
-				println("ev: ${ev}")
-			}
-
 			_ := <-done {
 				default_logger.info('receive done signal, closing connection')
 
