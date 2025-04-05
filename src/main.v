@@ -27,6 +27,7 @@ fn main() {
 	docker := DockerClient.new()
 
 	mut headers := http.new_header()
+	// This is not a real credentials you foool
 	headers.add_custom('X-Proxy-Name', 'dev')!
 	headers.add_custom('X-Proxy-Key', '5b39056b3ee1109708d7e0ab')!
 
