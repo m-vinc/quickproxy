@@ -5,14 +5,18 @@ import x.json2
 pub struct Command {
 	command    string
 	identifier string
-	data       ?json2.Any @[omitempty]
+	data       string
 }
 
-pub struct Payload {
-	type       string
+pub struct Message {
+	type       ?string @[omitempty]
 	identifier ?string
-	message    ?string
+
+	// Allow end-users decoding it as they want.
+	message ?string
 }
+
+pub type Data = map[string]json2.Any
 
 const welcome = 'welcome'
 const disconnect = 'disconnect'

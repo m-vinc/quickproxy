@@ -38,21 +38,16 @@ fn main() {
 
 	mut consumer := actioncable.Consumer.new('ws://localhost:3000/cable', headers)!
 
-	// Need a way to expose the subscription to add callbacks on it or send message on it
-	consumer.text("TotoChannel", none, fn [consumer](sub &actioncable.Subscription)! {
-		// React to message on TotoChannel, actioncable will subscribe implicitly
-		println("TotoChannel callback: ${sub}")
-	})!
-
-	go fn [mut consumer]() ! {
-		for {
-			select {
-				1000 * time.milisecond {
-					consumer.
-				}
+	consumer.subscribe('TotoChannel', actioncable.SubscribeParams{
+		on_confirmed: fn (mut sub actioncable.Subscription, msg &actioncable.Message) {
+			sub.perform('toto', actioncable.Data(map[string]json2.Any{})) or {
+				println('error performing')
 			}
 		}
-	}()
+		on_message: fn (mut sub actioncable.Subscription, msg &actioncable.Message) {
+			println('${msg}')
+		}
+	})!
 
 	go fn [mut consumer, done] () ! {
 		h := go consumer.start()

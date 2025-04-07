@@ -29,6 +29,7 @@ fn Connection.new(url string, header http.Header) !&Connection {
 	})
 
 	conn.client.on_message(fn [mut conn] (mut ws websocket.Client, msg &websocket.Message) ! {
+		println('receive ? -> ${msg.opcode} - ${msg.payload.bytestr()}')
 		match msg.opcode {
 			.continuation {}
 			.text_frame {
