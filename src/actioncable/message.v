@@ -5,7 +5,7 @@ import x.json2
 pub struct Command {
 	command    string
 	identifier string
-	data       json2.Any @[omitempty]
+	data       ?json2.Any @[omitempty]
 }
 
 pub struct Payload {
@@ -23,3 +23,4 @@ const unauthorized = 'unauthorized'
 const invalid_request = 'invalid_request'
 const server_restart = 'server_restart'
 const remote = 'remote'
+const channel = 'channel'

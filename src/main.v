@@ -1,7 +1,6 @@
 module main
 
 import os
-import time
 import net.http
 import actioncable
 import x.json2
@@ -39,11 +38,23 @@ fn main() {
 
 	mut consumer := actioncable.Consumer.new('ws://localhost:3000/cable', headers)!
 
-	consumer.on("open", fn [mut consumer] ()! {
-		consumer.subscribe("TotoChannel", json2.null)!
-	})
+	// Need a way to expose the subscription to add callbacks on it or send message on it
+	consumer.text("TotoChannel", none, fn [consumer](sub &actioncable.Subscription)! {
+		// React to message on TotoChannel, actioncable will subscribe implicitly
+		println("TotoChannel callback: ${sub}")
+	})!
 
-	go fn [mut consumer, done] ()! {
+	go fn [mut consumer]() ! {
+		for {
+			select {
+				1000 * time.milisecond {
+					consumer.
+				}
+			}
+		}
+	}()
+
+	go fn [mut consumer, done] () ! {
 		h := go consumer.start()
 		h.wait()!
 		done <- true

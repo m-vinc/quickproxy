@@ -50,13 +50,13 @@ fn Connection.new(url string, header http.Header) !&Connection {
 	return conn
 }
 
-type TextMessageFn = fn(mut ws websocket.Client, msg &websocket.Message)
+type TextMessageFn = fn (mut ws websocket.Client, msg &websocket.Message)
 
 @[heap]
 struct Connection {
 mut:
-	client        &websocket.Client
-	monitor       chan bool
+	client                    &websocket.Client
+	monitor                   chan bool
 	on_text_message_callbacks []TextMessageFn
 }
 
@@ -88,6 +88,12 @@ fn (mut conn Connection) monitor() ! {
 	}
 }
 
+fn (mut conn Connection) alive() bool {
+	rlock conn.client.client_state {
+		return conn.client.client_state.state == websocket.State.open
+	}
+}
+
 fn (mut conn Connection) need_reconnect() bool {
 	rlock conn.client.client_state {
 		return conn.client.client_state.state == websocket.State.closed
@@ -104,7 +110,7 @@ fn (mut conn Connection) close() ! {
 	conn.client.close(1000, 'closed by us')!
 }
 
-fn (mut conn Connection) write_string(s string)! {
+fn (mut conn Connection) write_string(s string) ! {
 	conn.client.write_string(s)!
 }
 
@@ -112,3 +118,10 @@ fn (mut conn Connection) on_text_message(f TextMessageFn) {
 	conn.on_text_message_callbacks << f
 }
 
+fn (mut conn Connection) on_open(f fn (mut ws websocket.Client) !) {
+	conn.client.on_open(f)
+}
+
+fn (mut conn Connection) on_close(f fn (mut ws websocket.Client, code int, reason string) !) {
+	conn.client.on_close(f)
+}

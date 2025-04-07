@@ -13,6 +13,22 @@ pub fn Consumer.new(url string, header http.Header) !&Consumer {
 		subscriptions: subscriptions,
 	}
 
+	consumer.connection.on_open(fn [mut consumer] (mut ws websocket.Client) ! {
+		lock consumer.subscriptions {
+			for sub in consumer.subscriptions {
+				consumer.ensure_subscribe(sub)!
+			}
+		}
+	})
+
+	consumer.connection.on_close(fn [mut consumer] (mut ws websocket.Client, code int, reason string) ! {
+		lock consumer.subscriptions {
+			for _, mut sub in consumer.subscriptions {
+				sub.confirmed = false
+			}
+		}
+	})
+
 	consumer.connection.on_text_message(fn [mut consumer] (mut ws websocket.Client, msg &websocket.Message) {
 		payload := json2.decode[Payload](msg.payload.bytestr()) or { return }
 
@@ -24,7 +40,8 @@ pub fn Consumer.new(url string, header http.Header) !&Consumer {
 			ping { }
 			confirmation { consumer.on_confirm_subscription(payload) or { return } }
 			// rejection { conn.client.pong()! }
-			// unauthorized { conn.client.pong()! }
+			unauthorized { consumer.close() or { consumer.logger.info("receiving an unauthorized, let the server close it") } }
+			channel { consumer.on_channel_message(payload) or { return } }
 			// invalid_request { conn.client.pong()! }
 			// server_restart { conn.client.pong()! }
 			// remote { conn.client.pong()! }
@@ -35,8 +52,22 @@ pub fn Consumer.new(url string, header http.Header) !&Consumer {
 	return consumer
 }
 
-pub struct Event {
-	type string
+fn (mut consumer Consumer) on_channel_message(payload &Payload)! {
+	if payload.identifier != none {
+		identifier := json2.decode[Identifier](payload.identifier)!
+		rlock consumer.subscriptions {
+			for sub in consumer.subscriptions {
+				if sub.channel == identifier.channel {
+					for callback in sub.on_message_callbacks {
+						callback(sub)!
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return error("channel_message has no identifier")
 }
 
 pub struct Consumer {
@@ -52,19 +83,37 @@ pub fn (mut consumer Consumer) start() ! {
 	consumer.connection.monitor()!
 }
 
-pub fn (mut consumer Consumer) subscribe(channel string, data json2.Any) ! {
+pub fn (mut consumer Consumer) ensure_subscribe(sub &Subscription) ! {
+	rlock consumer.subscriptions {
+			subscribe_command := sub.subscribe_command()
+			// We only throw that data away and wait for a confirmation, no subscription_guarantor for now
+			consumer.connection.write_string(subscribe_command)!
+	}
+}
+
+pub fn (mut consumer Consumer) subscribe(channel string, data ?json2.Any) ! &Subscription {
 	lock consumer.subscriptions {
-		for sub in consumer.subscriptions {
-			if sub.channel == channel {
-				return
+		mut sub := ?&Subscription(none)
+		for mut s in consumer.subscriptions {
+			if s.channel == channel {
+				sub = s
+				break
 			}
 		}
 
-		mut sub := Subscription.new(consumer, channel, data)!
-		consumer.subscriptions << sub
+		if sub == none {
+			mut new_sub := Subscription.new(consumer, channel, data)!
+			consumer.subscriptions << new_sub
 
-		subscribe_command := sub.subscribe_command()
-		consumer.connection.write_string(subscribe_command)!
+			if consumer.connection.alive() {
+				// We only throw that data away and wait for a confirmation, no subscription_guarantor for now
+				subscribe_command := new_sub.subscribe_command()
+				consumer.connection.write_string(subscribe_command)!
+			}
+			return new_sub
+		} else {
+			return sub
+		}
 	}
 }
 
@@ -83,6 +132,27 @@ pub fn (mut consumer Consumer) unsubscribe(channel string, data json2.Any) ! {
 
 pub fn (mut consumer Consumer) close() ! {
 	consumer.connection.close()!
+}
+
+pub fn (mut consumer Consumer) text(channel string, data ?json2.Any, f SubscriptionHandleFn) ! {
+	lock consumer.subscriptions {
+		mut current_sub := ?&Subscription(none)
+		for mut sub in consumer.subscriptions {
+			if sub.channel == channel {
+				current_sub = sub
+				break
+			}
+		}
+
+		if current_sub != none {
+			// Maybe we want to update the subscription data ?
+		} else {
+			mut sub := consumer.subscribe(channel, data)!
+			sub.on_message_callbacks << f
+		}
+	}
+
+	return
 }
 
 fn (mut consumer Consumer) on_confirm_subscription(payload &Payload) ! {
@@ -111,4 +181,8 @@ pub fn (mut consumer Consumer) on(event_name string, handler fn()!) {
 		}
 	else {}
 	}
+}
+
+fn (mut consumer Consumer) write_string(data string) ! {
+	return consumer.connection.write_string(data)
 }
