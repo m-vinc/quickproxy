@@ -42,7 +42,10 @@ pub fn Consumer.new(url string, header http.Header) !&Consumer {
 				welcome {
 					consumer.logger.info('receive welcome from server ~')
 				}
-				// disconnect { conn.client.pong()! }
+				disconnect {
+					consumer.logger.info('receiving a disconnect, closing the connection')
+					consumer.close() or { return }
+				}
 				ping {}
 				confirmation {
 					consumer.on_confirm_subscription(message) or { return }
@@ -102,11 +105,9 @@ pub fn (mut consumer Consumer) start() ! {
 }
 
 pub fn (mut consumer Consumer) ensure_subscribe(sub &Subscription) ! {
-	rlock consumer.subscriptions {
-		subscribe_command := sub.subscribe_command()
-		// We only throw that data away and wait for a confirmation, no subscription_guarantor for now
-		consumer.connection.write_string(subscribe_command)!
-	}
+	subscribe_command := sub.subscribe_command()
+	// We only throw that data away and wait for a confirmation, no subscription_guarantor for now
+	consumer.connection.write_string(subscribe_command)!
 }
 
 pub fn (mut consumer Consumer) subscribe(channel string, params SubscribeParams) !&Subscription {

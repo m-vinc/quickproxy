@@ -15,21 +15,9 @@ fn Connection.new(url string, header http.Header) !&Connection {
 
 	conn.client.header = header
 
-	conn.client.on_open(fn [mut conn] (mut ws websocket.Client) ! {
-		conn.client.logger.info('conn.Client.on_open websocket connected to the server and ready to send messages...')
-	})
-
-	conn.client.on_error(fn [mut conn] (mut ws websocket.Client, err string) ! {
-		conn.client.logger.info('on_error error: ${err}')
-		conn.monitor <- true
-	})
-
-	conn.client.on_close(fn [mut conn] (mut ws websocket.Client, code int, reason string) ! {
-		conn.client.logger.info('on_close the connection to the server successfully closed (${code} - ${reason})')
-	})
-
 	conn.client.on_message(fn [mut conn] (mut ws websocket.Client, msg &websocket.Message) ! {
-		println('receive ? -> ${msg.opcode} - ${msg.payload.bytestr()}')
+		conn.client.logger.info('receive message -> ${msg.opcode} - ${msg.payload.bytestr()}')
+
 		match msg.opcode {
 			.continuation {}
 			.text_frame {
@@ -57,14 +45,18 @@ type TextMessageFn = fn (mut ws websocket.Client, msg &websocket.Message)
 struct Connection {
 mut:
 	client                    &websocket.Client
+	reconnect                 bool = true
 	monitor                   chan bool
 	on_text_message_callbacks []TextMessageFn
 }
 
 fn (mut conn Connection) listen() ! {
-	conn.client.connect()!
+	if !conn.reconnect {
+		return
+	}
 
 	go fn [mut conn] () ! {
+		conn.client.connect()!
 		conn.client.listen()!
 		conn.monitor <- true
 	}()
@@ -78,6 +70,9 @@ fn (mut conn Connection) monitor() ! {
 		select {
 			_ := <-conn.monitor {
 				conn.client.logger.info('can we try to re-connect ?')
+				if !conn.need_reconnect() {
+					return
+				}
 			}
 			500 * time.millisecond {
 				if conn.need_reconnect() {
@@ -97,12 +92,13 @@ fn (mut conn Connection) alive() bool {
 
 fn (mut conn Connection) need_reconnect() bool {
 	rlock conn.client.client_state {
-		return conn.client.client_state.state == websocket.State.closed
+		return conn.client.client_state.state == websocket.State.closed && conn.reconnect
 	}
 }
 
 fn (mut conn Connection) close() ! {
 	rlock conn.client.client_state {
+		conn.reconnect = false
 		if conn.client.client_state.state != websocket.State.open {
 			return
 		}

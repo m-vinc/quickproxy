@@ -38,20 +38,21 @@ fn main() {
 
 	mut consumer := actioncable.Consumer.new('ws://localhost:3000/cable', headers)!
 
-	consumer.subscribe('TotoChannel', actioncable.SubscribeParams{
-		on_confirmed: fn (mut sub actioncable.Subscription, msg &actioncable.Message) {
-			sub.perform('toto', actioncable.Data(map[string]json2.Any{})) or {
+	consumer.subscribe('ProxyChannel', actioncable.SubscribeParams{
+		on_confirmed: fn (mut sub actioncable.Subscription, message &actioncable.Message) {
+			sub.perform('announce', actioncable.Data(map[string]json2.Any{})) or {
 				println('error performing')
 			}
 		}
-		on_message: fn (mut sub actioncable.Subscription, msg &actioncable.Message) {
-			println('${msg}')
+		on_message:   fn (mut sub actioncable.Subscription, message &actioncable.Message) {
+			println('${message}')
 		}
 	})!
 
 	go fn [mut consumer, done] () ! {
 		h := go consumer.start()
 		h.wait()!
+		println('consumer  stop')
 		done <- true
 	}()
 
